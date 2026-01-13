@@ -234,6 +234,87 @@
         input, select, textarea {
             font-size: 16px;
         }
+
+        /* Modal Styling */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .close-modal {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #787c7e;
+        }
+
+        .stats-container {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+
+        .stat-val { font-size: 24px; font-weight: bold; }
+        .stat-label { font-size: 12px; }
+
+        /* Graph Styling */
+        #guessGraph {
+            text-align: left;
+            margin: 20px 0;
+        }
+
+        .graph-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-family: sans-serif;
+        }
+
+        .graph-label { width: 15px; font-weight: bold; margin-right: 10px; }
+
+        .graph-bar {
+            background: #787c7e;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            min-width: 20px;
+            font-size: 14px;
+            text-align: right;
+            transition: width 1s ease-in-out;
+        }
+
+        .graph-bar.highlight { background: #6aaa64; } /* Green for the current score */
+
+        .hidden {
+            display: none !important;
+        }
+
     </style>
 </head>
 <body>
@@ -282,10 +363,32 @@
             </div>
         </div>
 
-        <button class="new-game-btn hidden" id="newGameBtn">Play Again</button>
+        <button class="new-game-btn hidden" id="newGameBtn" onclick="initGame()">Play Again 💝</button>
+
+        <div id="statsModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2 id="modalTitle">Statistics</h2>
+                <div class="stats-container">
+                    <div class="stat-box"><div id="totalPlayed" class="stat-val">0</div><div class="stat-label">Played</div></div>
+                    <div class="stat-box"><div id="winPct" class="stat-val">0</div><div class="stat-label">Win %</div></div>
+                </div>
+                <h3>Guess Distribution</h3>
+                <div id="guessGraph">
+                    </div>
+                    <button class="new-game-btn" onclick="initGame()">Play Again 💝</button>
+            </div>
+        </div>
+
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <script>
+        const supabaseUrl = "https://obnntrsrukgmvvmfcgfm.supabase.co";
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ibm50cnNydWtnbXZ2bWZjZ2ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMzkyODMsImV4cCI6MjA4MzgxNTI4M30.z4_ihQefkQ3oXeDKsdgyyk57VvBp344R0BtIzwPODrc";
+        const { createClient } = supabase;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
         const WORD_LIST = [
             "BAMBI", "BABSI", "MALLE", "LIEBE", "HERZL", "KUSSI", "SCHATZ", "TRAUM", "SONNE", "BUSSI",
             "PUSSY", "HONEY", "PENIS", "LOVER",
@@ -362,28 +465,46 @@
         const keys = document.querySelectorAll('.key');
 
         function initGame() {
-            targetWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+            // 1. Reset game state first
             currentRow = 0;
             currentTile = 0;
             gameOver = false;
-            message.textContent = '';
-            message.className = 'message';
-            newGameBtn.classList.add('hidden');
+            targetWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
             
-            board.innerHTML = '';
-            for (let i = 0; i < MAX_GUESSES; i++) {
-                const row = document.createElement('div');
-                row.className = 'row';
-                for (let j = 0; j < 5; j++) {
-                    const tile = document.createElement('div');
-                    tile.className = 'tile';
-                    tile.id = `tile-${i}-${j}`;
-                    row.appendChild(tile);
+            // 2. Hide UI elements safely
+            const modal = document.getElementById('statsModal');
+            if (modal) modal.classList.add('hidden');
+            
+            // We use a query selector to find the button even if the ID is missing
+            const gameBtn = document.getElementById('newGameBtn') || document.querySelector('.new-game-btn');
+            if (gameBtn) gameBtn.classList.add('hidden');
+
+            const messageEl = document.getElementById('message');
+            if (messageEl) {
+                messageEl.textContent = '';
+                messageEl.className = 'message';
+            }
+            
+            // 3. Clear the board
+            const boardEl = document.getElementById('board');
+            if (boardEl) {
+                boardEl.innerHTML = '';
+                for (let i = 0; i < MAX_GUESSES; i++) {
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    for (let j = 0; j < 5; j++) {
+                        const tile = document.createElement('div');
+                        tile.className = 'tile';
+                        tile.id = `tile-${i}-${j}`;
+                        row.appendChild(tile);
+                    }
+                    boardEl.appendChild(row);
                 }
-                board.appendChild(row);
             }
 
-            keys.forEach(key => {
+            // 4. Reset keys
+            const allKeys = document.querySelectorAll('.key');
+            allKeys.forEach(key => {
                 key.className = 'key' + (key.dataset.key === 'ENTER' || key.dataset.key === 'BACKSPACE' ? ' wide' : '');
             });
         }
@@ -442,11 +563,18 @@
                     message.textContent = '🎉 Amazing! You got it! 💝';
                     message.className = 'message win';
                     gameOver = true;
+                    saveGameResult(targetWord, currentRow + 1, true);
+                    
+                    // Wait 1.5 seconds so the user can see the green tiles before the popup
+                    setTimeout(() => loadStats(targetWord), 1500); 
+                    
                     newGameBtn.classList.remove('hidden');
                 } else if (currentRow === MAX_GUESSES - 1) {
                     message.textContent = `The word was ${targetWord}. Try again! 💪`;
                     message.className = 'message lose';
                     gameOver = true;
+                    saveGameResult(targetWord, MAX_GUESSES, false);
+                    setTimeout(() => loadStats(targetWord), 1500);
                     newGameBtn.classList.remove('hidden');
                 } else {
                     currentRow++;
@@ -517,6 +645,84 @@
             }, 2000);
         }
 
+        // Change this function to use the correct client name and add error logging
+        async function saveGameResult(word, tries, won) {
+            const { data, error } = await supabaseClient // Changed from supabase to supabaseClient
+                .from('wordle_results')
+                .insert([
+                    {
+                        word: word,
+                        tries: tries,
+                        won: won
+                    }
+                ]);
+
+            if (error) {
+                console.error("Supabase Insert Error:", error.message);
+            } else {
+                console.log("Result saved successfully!");
+            }
+        }
+
+        async function loadStats(word) {
+            // 1. Fetch all attempts for this word
+            const { data, error } = await supabaseClient
+                .from('wordle_results')
+                .select('tries, won')
+                .eq('word', word);
+
+            if (error) return console.error(error);
+
+            const totalPlayed = data.length;
+            const wins = data.filter(r => r.won).length;
+            const winPct = totalPlayed > 0 ? Math.round((wins / totalPlayed) * 100) : 0;
+
+            const distribution = [0, 0, 0, 0, 0, 0];
+            data.forEach(row => {
+                if (row.won && row.tries <= 6) {
+                    distribution[row.tries - 1]++;
+                }
+            });
+
+            showStatsModal(totalPlayed, winPct, distribution);
+        }
+
+        function showStatsModal(total, pct, dist) {
+            const modal = document.getElementById('statsModal');
+            modal.classList.remove('hidden');
+
+            document.getElementById('totalPlayed').textContent = total;
+            document.getElementById('winPct').textContent = pct;
+            document.getElementById('modalTitle').textContent = pct === 100 ? "Perfect Score! 👑" : "Game Over";
+
+            const graphContainer = document.getElementById('guessGraph');
+            graphContainer.innerHTML = ''; // Clear old graph
+
+            const maxVal = Math.max(...dist, 1); // For scaling bar width
+
+            dist.forEach((count, i) => {
+                const row = document.createElement('div');
+                row.className = 'graph-row';
+                
+                // Calculate width percentage (min 7% so number is visible)
+                const width = Math.max((count / maxVal) * 90, 7);
+                
+                // Highlight the current attempt row
+                const isCurrent = (i === currentRow); 
+
+                row.innerHTML = `
+                    <div class="graph-label">${i + 1}</div>
+                    <div class="graph-bar ${isCurrent ? 'highlight' : ''}" style="width: ${width}%">
+                        ${count}
+                    </div>
+                `;
+                graphContainer.appendChild(row);
+            });
+
+            // Close button logic
+            document.querySelector('.close-modal').onclick = () => modal.classList.add('hidden');
+        }
+
         keys.forEach(key => {
             key.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -548,7 +754,9 @@
             }
         });
 
-        newGameBtn.addEventListener('click', initGame);
+        if (newGameBtn) {
+            newGameBtn.addEventListener('click', initGame);
+        }
 
         initGame();
     </script>

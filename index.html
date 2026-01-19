@@ -391,11 +391,11 @@
         const supabaseClient = createClient(supabaseUrl, supabaseKey);
         const WORD_LIST = [
             "BAMBI", "BABSI", "MALLE", "LIEBE", "HERZL", "KUSSI", "SCHATZ", "TRAUM", "SONNE", "BUSSI",
-            "PUSSY", "HONEY", "PENIS", "LOVER",
+            "PUSSY", "HONEY", "PENIS", "LOVER", "ERNTE", "MARCI", "PROST", "PROSA", "WELPE",
             "ABEND", "ACKER", "ADLER", "ALARM", "ALPEN", "AMPEL", "AMSEL", "ANGST", "ANKER", "ANRUF",
             "ANZUG", "APFEL", "ARENA", "AROMA", "ASCHE", "ATLAS", "AUTOR", "BAUCH", "BAUER", "BEERE",
             "BESEN", "BETON", "BEUTE", "BIBEL", "BIENE", "BIRKE", "BIRNE", "BLATT", "BLICK", "BLITZ",
-            "BLOCK", "BLUME", "BLUSE", "BODEN", "BOGEN", "BOHNE", "BOMBE", "BONUS", "BOOTE", "BRAND",
+            "BLOCK", "BLUME", "BLUSE", "BODEN", "BOGEN", "BOHNE", "BOMBE", "BONUS", "BRAND",
             "BRAUT", "BRETT", "BRIEF", "BRISE", "BRUCH", "BRUST", "BUCHE", "BUCHT", "BUSCH",
             "CHAOS", "CHART", "CLOWN", "COACH", "COUCH", "CREME", "DACHS", "DAMPF", "DATEI", "DATEN",
             "DATUM", "DAUER", "DECKE", "DEGEN", "DEICH", "DEPOT", "DIELE", "DISKO", "DOCHT",
@@ -546,6 +546,11 @@
             
             if (!WORD_LIST.includes(guess)) {
                 showMessage('Not in word list!');
+                
+                // --- NEW LOGIC START ---
+                logMissingWord(guess);
+                // --- NEW LOGIC END ---
+
                 for (let i = 0; i < 5; i++) {
                     const tile = document.getElementById(`tile-${currentRow}-${i}`);
                     tile.textContent = '';
@@ -685,6 +690,23 @@
             });
 
             showStatsModal(totalPlayed, winPct, distribution);
+        }
+
+        async function logMissingWord(word) {
+            try {
+                // Changed from _supabase to supabaseClient to match your initialization
+                const { error } = await supabaseClient
+                    .from('missing_words')
+                    .insert([{ word: word }]);
+                    
+                if (error) {
+                    console.error('Supabase Error:', error.message);
+                } else {
+                    console.log('Missing word logged:', word);
+                }
+            } catch (err) {
+                console.error('Connection failed:', err);
+            }
         }
 
         function showStatsModal(total, pct, dist) {
